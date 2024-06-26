@@ -7,46 +7,40 @@ if [ $# -eq 0 ]; then
 fi
 
 FILENAME=$1
-LINE_NUMBERS_TO_DELETE=(2) # Always delete the second line
+TEMPFILE=$(mktemp)
 DELETED_COUNT=0
 
-# Use awk to process the file: replace "NULL" with blanks and find the line numbers of rows that do not have 52 columns
-awk -F'|' '{
+# Use awk to process the file: replace "NULL" with blanks and identify rows that do not have 52 columns
+awk -F'|' '
+BEGIN { OFS = FS }
+{
+  # Replace "NULL" with blanks in all columns
   for (i = 1; i <= NF; i++) {
     if ($i == "NULL") $i = ""
   }
-  if (NF != 52) {
-    print NR
+  
+  # Print only rows with 52 columns to the temp file
+  if (NF == 52) {
+    print $0 > "'$TEMPFILE'"
   } else {
-    print $0
+    DELETED_COUNT++
   }
-}' OFS='|' "$FILENAME" > "$FILENAME.tmp"
+}
+END {
+  print DELETED_COUNT > "/dev/stderr"
+}
+' "$FILENAME" 2> deleted_count.txt
 
-# Read the temporary file to find lines to delete
-awk -F'|' '{
-  if (NF != 52) {
-    print NR
-  }
-}' "$FILENAME.tmp" | while read -r line_number; do
-  # Avoid adding the second line twice
-  if [ "$line_number" -ne 2 ]; then
-    LINE_NUMBERS_TO_DELETE+=("$line_number")
-  fi
-  DELETED_COUNT=$((DELETED_COUNT + 1))
-done
-
-# Update the deleted count if the second line is not already counted
-if [ ${#LINE_NUMBERS_TO_DELETE[@]} -gt $DELETED_COUNT ]; then
+# Always delete the second line if it exists
+if [ $(wc -l < "$TEMPFILE") -ge 2 ]; then
+  sed -i '2d' "$TEMPFILE"
   DELETED_COUNT=$((DELETED_COUNT + 1))
 fi
 
-# Check if any lines need to be deleted
-if [ ${#LINE_NUMBERS_TO_DELETE[@]} -gt 0 ]; then
-  # Use sed to delete the lines in one go
-  sed -i.bak -e "$(printf '%sd;' "${LINE_NUMBERS_TO_DELETE[@]}")" "$FILENAME.tmp"
-  mv "$FILENAME.tmp" "$FILENAME"
-  echo "Number of rows deleted: $DELETED_COUNT"
-else
-  mv "$FILENAME.tmp" "$FILENAME"
-  echo "No rows deleted. All rows have 52 columns."
-fi
+# Move the temp file back to the original file
+mv "$TEMPFILE" "$FILENAME"
+
+# Print the number of deleted rows
+DELETED_COUNT=$(<deleted_count.txt)
+echo "Number of rows deleted: $DELETED_COUNT"
+rm deleted_count.txt
