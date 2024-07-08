@@ -7,11 +7,11 @@ if [ $# -eq 0 ]; then
 fi
 
 FILENAME=$1
-TEMPFILE=$(mktemp)
+NEWFILENAME="new_file.csv"
 DELETED_COUNT=0
 
 # Use awk to process the file: replace "NULL" with blanks and identify rows that do not have 52 columns
-DELETED_COUNT=$(awk -F'|' '
+awk -F'|' '
 BEGIN { OFS = FS }
 {
   # Replace "NULL" with blanks in all columns
@@ -19,26 +19,24 @@ BEGIN { OFS = FS }
     if ($i == "NULL") $i = ""
   }
   
-  # Print only rows with 52 columns to the temp file
+  # Print only rows with 52 columns to the new file
   if (NF == 52) {
-    print $0 > "'$TEMPFILE'"
+    print $0
   } else {
     DELETED_COUNT++
   }
 }
 END {
-  print DELETED_COUNT
+  print DELETED_COUNT > "/dev/stderr"
 }
-' "$FILENAME")
+' "$FILENAME" > "$NEWFILENAME"
 
 # Always delete the second line if it exists
-if [ $(wc -l < "$TEMPFILE") -ge 2 ]; then
-  sed -i '2d' "$TEMPFILE"
+if [ $(wc -l < "$NEWFILENAME") -ge 2 ]; then
+  sed -i '2d' "$NEWFILENAME"
   DELETED_COUNT=$((DELETED_COUNT + 1))
 fi
 
-# Move the temp file back to the original file
-mv "$TEMPFILE" "$FILENAME"
-
 # Print the number of deleted rows
+DELETED_COUNT=$(awk 'END{print NR-1}' <<< "$DELETED_COUNT")
 echo "Number of rows deleted: $DELETED_COUNT"
