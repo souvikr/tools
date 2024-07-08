@@ -11,7 +11,7 @@ TEMPFILE=$(mktemp)
 DELETED_COUNT=0
 
 # Use awk to process the file: replace "NULL" with blanks and identify rows that do not have 52 columns
-awk -F'|' '
+DELETED_COUNT=$(awk -F'|' '
 BEGIN { OFS = FS }
 {
   # Replace "NULL" with blanks in all columns
@@ -27,9 +27,9 @@ BEGIN { OFS = FS }
   }
 }
 END {
-  print DELETED_COUNT > "/dev/stderr"
+  print DELETED_COUNT
 }
-' "$FILENAME" 2> deleted_count.txt
+' "$FILENAME")
 
 # Always delete the second line if it exists
 if [ $(wc -l < "$TEMPFILE") -ge 2 ]; then
@@ -41,6 +41,4 @@ fi
 mv "$TEMPFILE" "$FILENAME"
 
 # Print the number of deleted rows
-DELETED_COUNT=$(<deleted_count.txt)
 echo "Number of rows deleted: $DELETED_COUNT"
-rm deleted_count.txt
