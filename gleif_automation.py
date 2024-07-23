@@ -3,6 +3,17 @@ import zipfile
 import os
 import sys
 
+
+# Desired column order
+expected_order = ['c1', 'c2', 'c3']
+
+# Reorder data
+reordered_data = [{col: row[col] for col in expected_order} for row in data]
+
+# Display the reordered data
+print("Reordered JSON data:", reordered_data)
+
+
 def download_file(url, file_name):
     try:
         # Send a HTTP request to the URL
